@@ -1,0 +1,37 @@
+# ----------------------------------------------------------------
+# Arquivos de Dados e Resultados Gerados
+# ----------------------------------------------------------------
+# É uma prática de segurança fundamental não versionar dados brutos
+# ou gerados, especialmente se contiverem informações de pacientes.
+# O repositório deve conter apenas o CÓDIGO que processa os dados.
+*.xlsx
+*.csv
+*.png
+
+
+# ----------------------------------------------------------------
+# Arquivos e Pastas do Python
+# ----------------------------------------------------------------
+# Ignorar pastas de ambiente virtual
+venv/
+.venv/
+env/
+.env
+
+# Ignorar arquivos de cache do Python que são gerados automaticamente
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+# ----------------------------------------------------------------
+# Arquivos de Sistema Operacional e Editores de Código
+# ----------------------------------------------------------------
+# Arquivos de configuração de editores
+.vscode/
+.idea/
+
+# Arquivos de sistema do macOS e Windows
+.DS_Store
+Thumbs.db
