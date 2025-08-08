@@ -1,49 +1,49 @@
 import pandas as pd
-import os   # Módulo para lidar com caminhos de arquivos
+import os
 
 # --- Configurações ---
-# O arquivo de entrada está na mesma pasta que este script
-ARQUIVO_ENTRADA_EXCEL = 'MarinaSilva.xlsx'
-
-# O arquivo de saída será salvo na pasta 'analise'
-CAMINHO_SAIDA = os.path.join('..', 'analise', 'dados_limpos.xlsx')
-
+ARQUIVO_ENTRADA_EXCEL = 'Amplimed - Gestão de Clínicas (14).xlsx' 
+ARQUIVO_SAIDA_EXCEL = 'dados_limpos.xlsx'
+COLUNA_PARA_REMOVER = 'Data e Hora agendada'
 
 def limpar_e_salvar_planilha_excel():
-    print("--- INICIANDO SCRIPT DE LIMPEZA ---")
+    """
+    Lê o arquivo .xlsx, remove a coluna de data e salva a nova versão.
+    """
+    print("--- INICIANDO SCRIPT DE LIMPEZA (SEM DATA) ---")
     
     try:
-        print(f"Lendo o arquivo Excel: '{ARQUIVO_ENTRADA_EXCEL}'...")
-        df = pd.read_excel(ARQUIVO_ENTRADA_EXCEL)
+        print(f"Lendo o arquivo Excel: '{ARQUIVO_ENTRADA_EXCEL}' com o leitor 'calamine'...")
+        df = pd.read_excel(ARQUIVO_ENTRADA_EXCEL, engine='calamine')
+        print("Arquivo Excel lido com sucesso!")
+
     except FileNotFoundError:
         print(f"\n[ERRO FATAL]: O arquivo '{ARQUIVO_ENTRADA_EXCEL}' não foi encontrado na pasta 'limpeza'.")
         return
     except Exception as e:
-        print(f"[ERRO FATAL] Ocorreu um problema ao ler o arquivo Excel. Erro: {e}")
+        print(f"\n[ERRO FATAL] Ocorreu um problema ao ler o arquivo Excel. Erro: {e}")
         return
 
-    print("Realizando limpeza e padronização dos dados...")
+    print("Realizando limpeza dos dados...")
     df.columns = df.columns.str.strip()
-    data_col = 'Data e Hora agendada'
     
-    if data_col not in df.columns:
-        print(f"[ERRO FATAL] A coluna '{data_col}' não foi encontrada.")
-        return
-        
-    df[data_col] = df[data_col].astype(str)
-    df[data_col] = pd.to_datetime(df[data_col], dayfirst=True, errors='coerce')
-    df.dropna(subset=[data_col], inplace=True)
-    
-    print(f"Total de registros limpos: {len(df)}")
+    # --- A MUDANÇA ESTÁ AQUI ---
+    # Verificamos se a coluna de data existe e a removemos.
+    if COLUNA_PARA_REMOVER in df.columns:
+        df = df.drop(columns=[COLUNA_PARA_REMOVER])
+        print(f"Coluna '{COLUNA_PARA_REMOVER}' removida com sucesso.")
+    else:
+        print(f"Aviso: A coluna '{COLUNA_PARA_REMOVER}' não foi encontrada para ser removida.")
 
+    print(f"Total de registros a serem salvos: {len(df)}")
+
+    caminho_saida = os.path.join('..', 'analise', ARQUIVO_SAIDA_EXCEL)
     try:
-        # Garante que o diretório de saída exista
-        os.makedirs(os.path.dirname(CAMINHO_SAIDA), exist_ok=True)
-        
-        print(f"Salvando a planilha limpa em: '{CAMINHO_SAIDA}'...")
-        df.to_excel(CAMINHO_SAIDA, index=False, engine='openpyxl')
+        os.makedirs(os.path.dirname(caminho_saida), exist_ok=True)
+        print(f"Salvando a planilha limpa em: '{caminho_saida}'...")
+        df.to_excel(caminho_saida, index=False, engine='openpyxl')
         print("-" * 40)
-        print(" SUCESSO! O arquivo limpo foi salvo na pasta 'analise'!")
+        print(" SUCESSO! O arquivo limpo (sem data) foi salvo na pasta 'analise'!")
         print("-" * 40)
     except Exception as e:
         print(f"[ERRO FATAL] Não foi possível salvar o novo arquivo Excel. Erro: {e}")
