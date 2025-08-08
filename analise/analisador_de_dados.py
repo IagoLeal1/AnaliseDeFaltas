@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import re
 
 # --- CONFIGURAÇÕES DA ANÁLISE ---
 ARQUIVO_ENTRADA_LIMPO = 'dados_limpos.xlsx'
@@ -8,86 +9,150 @@ ARQUIVO_ENTRADA_LIMPO = 'dados_limpos.xlsx'
 # Nomes das colunas
 COLUNA_PACIENTE = 'Paciente'
 COLUNA_STATUS = 'Status'
+COLUNA_PROCEDIMENTO = 'Procedimento'
 
 # Apelidos para cada status
 STATUS_FALTOU = 'Ncompareceu'
 STATUS_PRESENTE = 'Finalizado'
 STATUS_CANCELADO = 'Cancelado'
 
-def gerar_relatorio_paciente(df, nome_do_paciente):
+def gerar_relatorios_completos(df, nome_do_paciente):
     """
-    Gera um relatório em texto, um arquivo Excel na pasta /relatorios
-    e um gráfico PNG na pasta /graficos.
+    Função principal que gera um kit completo de relatórios para um paciente:
+    - Um .txt para cada procedimento.
+    - Um .txt geral para a "chefia".
+    - Um .xlsx e .png para cada procedimento.
     """
-    print(f"\n🔎 --- GERANDO RELATÓRIO PARA: {nome_do_paciente} --- 🔎")
+    print(f"\n🔎 --- GERANDO KIT COMPLETO DE RELATÓRIOS PARA: {nome_do_paciente} --- 🔎")
+    
+    # --- 1. PREPARAÇÃO ---
     df_paciente = df[df[COLUNA_PACIENTE] == nome_do_paciente].copy()
 
     if df_paciente.empty:
         print(f"Paciente '{nome_do_paciente}' não encontrado.")
         return
 
-    # Cálculos...
-    presencas = (df_paciente[COLUNA_STATUS] == STATUS_PRESENTE).sum()
-    faltas = (df_paciente[COLUNA_STATUS] == STATUS_FALTOU).sum()
-    cancelados = (df_paciente[COLUNA_STATUS] == STATUS_CANCELADO).sum()
-    total_valido = presencas + faltas
-    taxa_de_falta = (faltas / total_valido) * 100 if total_valido > 0 else 0
-
-    print(f"Consultas finalizadas (presenças): {presencas}")
-    print(f"Consultas não comparecidas (faltas): {faltas}")
-    print(f"Consultas canceladas: {cancelados}")
-    print(f"📊 Taxa de Falta: {taxa_de_falta:.2f}%")
+    nome_pasta_paciente = nome_do_paciente.lower().replace(' ', '_')
+    caminho_pasta_relatorios = os.path.join('..', 'relatorios', nome_pasta_paciente)
+    caminho_pasta_graficos = os.path.join('..', 'graficos', nome_pasta_paciente)
+    os.makedirs(caminho_pasta_relatorios, exist_ok=True)
+    os.makedirs(caminho_pasta_graficos, exist_ok=True)
     
-    # --- Geração dos arquivos de saída com nome e pastas dinâmicas ---
+    procedimentos_unicos = df_paciente[COLUNA_PROCEDIMENTO].unique()
     
-    # 1. Cria um nome de arquivo "seguro"
-    nome_arquivo_seguro = nome_do_paciente.lower().replace(' ', '_')
-    
-    # 2. Define os caminhos de saída para as pastas corretas
-    #    ../ significa "voltar uma pasta" para chegar na pasta 'faltas'
-    caminho_relatorio_excel = os.path.join('..', 'relatorios', f'relatorio_{nome_arquivo_seguro}.xlsx')
-    caminho_grafico = os.path.join('..', 'graficos', f'grafico_{nome_arquivo_seguro}.png')
+    # Variáveis para guardar o resumo geral
+    resumos_para_chefia = []
+    total_presencas_geral = 0
+    total_faltas_geral = 0
+    total_cancelados_geral = 0
 
-    # 3. Garante que o diretório de relatórios exista e salva o Excel
-    try:
-        os.makedirs(os.path.dirname(caminho_relatorio_excel), exist_ok=True)
-        df_paciente.to_excel(caminho_relatorio_excel, index=False, engine='openpyxl')
-        print(f"\n✅ Relatório Excel salvo com sucesso em: '{caminho_relatorio_excel}'")
-    except Exception as e:
-        print(f"\n[ERRO] Não foi possível salvar o relatório Excel. Erro: {e}")
+    # --- 2. LOOP POR PROCEDIMENTO ---
+    for procedimento in procedimentos_unicos:
+        df_procedimento = df_paciente[df_paciente[COLUNA_PROCEDIMENTO] == procedimento]
 
-    # 4. Garante que o diretório de gráficos exista e salva o Gráfico
-    if total_valido > 0:
-        fig, ax = plt.subplots(figsize=(10, 7))
-        labels = ['Presenças', 'Faltas', 'Cancelados']
-        sizes = [presencas, faltas, cancelados]
-        cores = ['#2E8B57', '#DC143C', '#A9A9A9']
-        explode = (0, 0.1, 0)
-        ax.pie(sizes, explode=explode, labels=labels, colors=cores, autopct='%1.1f%%',
-               shadow=True, startangle=140, textprops={'fontsize': 12})
-        ax.axis('equal')
-        plt.title(f'Resumo de Consultas de\n{nome_do_paciente}', fontsize=16, weight='bold')
+        presencas = (df_procedimento[COLUNA_STATUS] == STATUS_PRESENTE).sum()
+        faltas = (df_procedimento[COLUNA_STATUS] == STATUS_FALTOU).sum()
+        cancelados = (df_procedimento[COLUNA_STATUS] == STATUS_CANCELADO).sum()
+        total_valido = presencas + faltas
+        taxa_de_falta = (faltas / total_valido) * 100 if total_valido > 0 else 0
+
+        # Acumula os totais para o resumo geral
+        total_presencas_geral += presencas
+        total_faltas_geral += faltas
+        total_cancelados_geral += cancelados
+
+        # Monta o texto do relatório para este procedimento
+        texto_relatorio_procedimento = f"""
+--- RELATÓRIO DO PROCEDIMENTO: {procedimento} ---
+Paciente: {nome_do_paciente}
+Data da Geração: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
+
+Consultas finalizadas (presenças): {presencas}
+Consultas não comparecidas (faltas): {faltas}
+Consultas canceladas: {cancelados}
+-------------------------------------------------
+📊 Taxa de Falta (sobre consultas válidas): {taxa_de_falta:.2f}%
+"""
+        # Guarda este resumo para o relatório final
+        resumos_para_chefia.append(texto_relatorio_procedimento)
+
+        # --- Geração dos arquivos de saída para o procedimento ---
+        nome_arquivo_base = re.sub(r'[\\/*?:"<>|]',"", procedimento).lower().replace(' ', '_')
         
+        # Salva o relatório .txt do procedimento
         try:
-            os.makedirs(os.path.dirname(caminho_grafico), exist_ok=True)
-            plt.savefig(caminho_grafico)
-            print(f"✅ Gráfico salvo com sucesso em: '{caminho_grafico}'")
+            caminho_txt = os.path.join(caminho_pasta_relatorios, f'relatorio_{nome_arquivo_base}.txt')
+            with open(caminho_txt, 'w', encoding='utf-8') as f:
+                f.write(texto_relatorio_procedimento.strip())
         except Exception as e:
-            print(f"\n[ERRO] Não foi possível salvar o gráfico. Erro: {e}")
-        
-        plt.close(fig)
+            print(f"     [ERRO] Falha ao salvar .txt: {e}")
 
-def rodar_analise_de_dados():
+        # Salva o relatório .xlsx do procedimento
+        caminho_excel = os.path.join(caminho_pasta_relatorios, f'relatorio_{nome_arquivo_base}.xlsx')
+        df_procedimento.to_excel(caminho_excel, index=False, engine='openpyxl')
+
+        # Gera e salva o Gráfico .png do procedimento
+        if total_valido > 0:
+            caminho_grafico = os.path.join(caminho_pasta_graficos, f'grafico_{nome_arquivo_base}.png')
+            # ... (código do gráfico, sem alterações)
+            fig, ax = plt.subplots()
+            ax.pie([presencas, faltas, cancelados], labels=['Presenças', 'Faltas', 'Cancelados'], colors=['#2E8B57', '#DC143C', '#A9A9A9'], autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            plt.title(f'Resumo de: {procedimento}\nPaciente: {nome_do_paciente}')
+            plt.savefig(caminho_grafico)
+            plt.close(fig)
+
+    # --- 3. GERAÇÃO DO RELATÓRIO MESTRE PARA A CHEFIA ---
+    total_valido_geral = total_presencas_geral + total_faltas_geral
+    taxa_falta_geral = (total_faltas_geral / total_valido_geral) * 100 if total_valido_geral > 0 else 0
+
+    texto_chefe_cabecalho = f"""
+=====================================================
+    RELATÓRIO CONSOLIDADO PARA A CHEFIA
+=====================================================
+Paciente: {nome_do_paciente}
+Data da Geração: {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}
+
+--- RESUMO GERAL (TODOS OS PROCEDIMENTOS) ---
+Consultas finalizadas (presenças): {total_presencas_geral}
+Consultas não comparecidas (faltas): {total_faltas_geral}
+Consultas canceladas: {total_cancelados_geral}
+-------------------------------------------------
+📊 Taxa de Falta GERAL: {taxa_falta_geral:.2f}%
+=====================================================
+
+--- DETALHAMENTO POR PROCEDIMENTO ---
+"""
+    # Junta o cabeçalho com todos os resumos de procedimentos
+    texto_chefe_final = texto_chefe_cabecalho + "\n".join(resumos_para_chefia)
+    
+    try:
+        nome_arquivo_seguro = nome_do_paciente.lower().replace(' ', '_')
+        caminho_chefe_txt = os.path.join(caminho_pasta_relatorios, f'resumo_chefe_{nome_arquivo_seguro}.txt')
+        with open(caminho_chefe_txt, 'w', encoding='utf-8') as f:
+            f.write(texto_chefe_final.strip())
+        print(f"\n✅ Relatório para a chefia salvo com sucesso em: '{caminho_chefe_txt}'")
+    except Exception as e:
+        print(f"\n[ERRO] Falha ao salvar relatório da chefia: {e}")
+
+def rodar_analise_automatica():
+    # ... (esta função não precisa de nenhuma alteração)
+    print("--- INICIANDO ANÁLISE AUTOMÁTICA PARA TODOS OS PACIENTES ---")
     try:
         df = pd.read_excel(ARQUIVO_ENTRADA_LIMPO)
     except FileNotFoundError:
-        print(f"[ERRO] O arquivo '{ARQUIVO_ENTRADA_LIMPO}' não foi encontrado na pasta 'analise'.")
-        print("Você executou o SCRIPT 1 ('limpador.py') primeiro?")
+        print(f"[ERRO] O arquivo '{ARQUIVO_ENTRADA_LIMPO}' não foi encontrado.")
         return
     
-    gerar_relatorio_paciente(df, 'Marina Silva')
+    lista_de_pacientes = df[COLUNA_PACIENTE].unique()
+    print(f"Encontrados {len(lista_de_pacientes)} pacientes únicos na planilha.")
     
-    print("\nAnálise finalizada!")
+    for nome_paciente in lista_de_pacientes:
+        print("-" * 50)
+        gerar_relatorios_completos(df, nome_paciente)
+
+    print("-" * 50)
+    print("\nAnálise automática finalizada para todos os pacientes!")
 
 if __name__ == "__main__":
-    rodar_analise_de_dados()
+    rodar_analise_automatica()
