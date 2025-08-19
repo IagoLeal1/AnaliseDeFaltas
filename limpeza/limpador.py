@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # --- Configurações ---
-ARQUIVO_ENTRADA_EXCEL = 'Amplimed - Gestão de Clínicas (14).xlsx' 
+ARQUIVO_ENTRADA_EXCEL = 'amplimed.xlsx' 
 ARQUIVO_SAIDA_EXCEL = 'dados_limpos.xlsx'
 COLUNA_PARA_REMOVER = 'Data e Hora agendada'
 
